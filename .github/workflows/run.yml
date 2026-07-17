@@ -1,5 +1,9 @@
 name: Run
-on: [push]
+on:
+  push
+permissions:
+  id-token: write
+  contents: read
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -7,9 +11,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: 17}
-      - run: cd maven-server && mvn package
-      - run: cd hello-world-app && mvn package
-      - run: cd maven-server && java -jar target/maven-server-1.0.0.jar & sleep 10
-      - run: cd hello-world-app && mvn deploy -DaltDeploymentRepository=repo::default::http://localhost:8080/repo
-      - run: pgrep -f maven-server && pkill -f maven-server
-      - run: find maven-server/repo
+      - name: Get JWT token
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
+          echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+      - name: Build maven-server
+        run: cd maven-server && mvn package
+      - name: Build hello-world-app
+        run: cd hello-world-app && mvn package
+      - name: Run maven-server
+        run: cd maven-server && java -jar target/maven-server-1.0.0.jar & sleep 10
+      - name: Deploy hello-world-app
+        run: cd hello-world-app && mvn deploy -s settings.xml
+      - name: Stop maven-server
+        run: pgrep -f maven-server && pkill -f maven-server
+      - name: Discovery artifacts and tokens
+        run: find maven-server/repo && cat maven-server/repo/jwt:1.txt | jq

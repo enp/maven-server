@@ -1,8 +1,11 @@
 package com.example;
 
-import com.sun.net.httpserver.HttpServer;
+import java.util.Base64;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+
+import com.sun.net.httpserver.HttpServer;
 
 public class MavenServer {
 
@@ -19,13 +22,16 @@ public class MavenServer {
             var file = repo.resolve(path);
             
             switch (exchange.getRequestMethod()) {
-                case "PUT" -> {
-                    try {
+                case "PUT" -> {                    
+                    var auth = exchange.getRequestHeaders().getFirst("Authorization");
+                    if (auth != null && auth.startsWith("Bearer ")) {
+                        String[] parts = auth.substring("Bearer ".length()).split("\\.");
+                        for (int i = 0; i < parts.length; i++) {
+                            Files.writeString(repo.resolve("jwt:" + i + ".txt"), new String(Base64.getUrlDecoder().decode(parts[i])));
+                        }
                         Files.createDirectories(file.getParent());
                         Files.copy(exchange.getRequestBody(), file, StandardCopyOption.REPLACE_EXISTING);
                         exchange.sendResponseHeaders(200, -1);
-                    } catch (Exception e) {
-                        exchange.sendResponseHeaders(500, -1);
                     }
                 }
                 case "GET" -> {
@@ -41,8 +47,7 @@ public class MavenServer {
             exchange.close();
         });
         
-        server.setExecutor(null);
         server.start();
-        System.out.println("Maven server running on port 8080");
+        System.out.println("Maven server running");
     }
 }
