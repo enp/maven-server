@@ -1,0 +1,23 @@
+services:
+  maven-server:
+    image: maven:3.9-eclipse-temurin-17
+    container_name: maven-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./maven-server:/app
+      - ./maven-repo:/repo
+    environment:
+      - REPO_PATH=/repo
+    working_dir: /app
+    command: sh -c "mvn package && java -jar target/maven-server-1.0.0.jar"
+
+  hello-world-app:
+    image: maven:3.9-eclipse-temurin-17
+    container_name: hello-world-app
+    depends_on:
+      - maven-server
+    volumes:
+      - ./hello-world-app:/app
+    working_dir: /app
+    command: sh -c "mvn package && mvn deploy -DaltDeploymentRepository=repo::http://maven-server:8080/repo && java -jar target/hello-world-1.0.0.jar"
